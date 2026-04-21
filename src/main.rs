@@ -10,7 +10,7 @@ const ZOOM_WHEEL_SENSITIVITY: f32 = 0.1;
 const BACKGROUND_COLOR: prelude::Color = prelude::Color::from_hex(0x424242);
 const ALIVE_CELL_COLOR: prelude::Color = prelude::Color::from_hex(0xEBE8E8);
 
-const DENSITY:f64 = 0.5;
+
 
 static PADDING:i32 = 4;
 static CELL_SIZE:i32 = 8;
@@ -88,17 +88,33 @@ fn screen_to_world(
 #[macroquad::main("Conway's Game of Life")]
 async fn main() {
 
+    let mut density:f64 = 0.5;
+    let mut height:f32 = 1000.0;
+    let mut width:f32 = 2000.0;
+
+    if std::env::args().len() > 1 {
+        density = std::env::args().nth(1).unwrap().parse::<f64>().unwrap_or(density);
+    }
+
+    if std::env::args().len() > 2 {
+        height = std::env::args().nth(2).unwrap().parse::<f32>().unwrap_or(height);
+    }
+
+    if std::env::args().len() > 3 {
+        width = std::env::args().nth(3).unwrap().parse::<f32>().unwrap_or(width);
+    }
+
     let mut camera_offset = (
         prelude::screen_width() / 2.0,
         prelude::screen_height() / 2.0,
     );
 
 
-    let dimensions = 1000.0;
+
     let mut alive_cells :HashSet<Cell> = initialize_cells(
-        screen_to_world( (-dimensions*2.0, -dimensions), CELL_SIZE as f32, camera_offset ),
-        screen_to_world(( dimensions*2.0, dimensions ), CELL_SIZE as f32, camera_offset),
-        DENSITY
+        screen_to_world( (-width/2.0, -height/2.0), CELL_SIZE as f32, camera_offset ),
+        screen_to_world(( width/2.0, height/2.0 ), CELL_SIZE as f32, camera_offset),
+        density
     );
 
 
@@ -187,7 +203,7 @@ fn initialize_cells(top_left: (i32,i32), bottom_right:(i32,i32), density:f64) ->
 
     for x in min_x..=max_x {
         for y in min_y..=max_y {
-            if rand::random_bool( clamp(density, 0.0, 1.0) ) {
+            if rand::random_bool( density ) {
                 alive_cells.insert((x, y));
             }
         }
