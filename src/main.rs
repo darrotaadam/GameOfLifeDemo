@@ -3,13 +3,14 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use macroquad::input::mouse_position;
-use macroquad::math::Vec2;
+use macroquad::math::{clamp, Vec2};
 
 const ZOOM_WHEEL_SENSITIVITY: f32 = 0.1;
 
 const BACKGROUND_COLOR: prelude::Color = prelude::Color::from_hex(0x424242);
 const ALIVE_CELL_COLOR: prelude::Color = prelude::Color::from_hex(0xEBE8E8);
 
+const DENSITY:f64 = 0.5;
 
 static PADDING:i32 = 4;
 static CELL_SIZE:i32 = 8;
@@ -96,7 +97,8 @@ async fn main() {
     let dimensions = 1000.0;
     let mut alive_cells :HashSet<Cell> = initialize_cells(
         screen_to_world( (-dimensions*2.0, -dimensions), CELL_SIZE as f32, camera_offset ),
-        screen_to_world(( dimensions*2.0, dimensions ), CELL_SIZE as f32, camera_offset)
+        screen_to_world(( dimensions*2.0, dimensions ), CELL_SIZE as f32, camera_offset),
+        DENSITY
     );
 
 
@@ -137,7 +139,7 @@ async fn main() {
         }
 
         prelude::clear_background(BACKGROUND_COLOR);
-        
+
 
         timer += prelude::get_frame_time();
         if timer > 0.01 {
@@ -157,7 +159,7 @@ async fn main() {
                 (CELL_SIZE - PADDING ) as f32* zoom_factor,
                 ALIVE_CELL_COLOR
             );
-            
+
         }
 
 
@@ -168,9 +170,10 @@ async fn main() {
 
 
 
-fn initialize_cells(top_left: (i32,i32), bottom_right:(i32,i32)) -> HashSet<Cell> {
+fn initialize_cells(top_left: (i32,i32), bottom_right:(i32,i32), density:f64) -> HashSet<Cell> {
     /*
-        * Initialise les cellules avec une chance sur 3 d'être vivantes (changera peut être)
+
+        * Initialise les cellules avec une chance de density/1.0 (doit être entre 0.0 et 1.0)
         * Recupere les coordonnées du coin supérieur gauche et du coin inférieur droit pour créer un rectangle dans lequel les cellules seront initialisées
         * Les coordonnées sont celles des cellules.
     */
@@ -184,7 +187,7 @@ fn initialize_cells(top_left: (i32,i32), bottom_right:(i32,i32)) -> HashSet<Cell
 
     for x in min_x..=max_x {
         for y in min_y..=max_y {
-            if rand::random_bool(1.0 / 5.0) {
+            if rand::random_bool( clamp(density, 0.0, 1.0) ) {
                 alive_cells.insert((x, y));
             }
         }
