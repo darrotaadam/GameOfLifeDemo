@@ -84,7 +84,7 @@ fn screen_to_world(
 
 
 
-#[macroquad::main("MyGame")]
+#[macroquad::main("Conway's Game of Life")]
 async fn main() {
 
     let mut camera_offset = (
@@ -137,9 +137,7 @@ async fn main() {
         }
 
         prelude::clear_background(BACKGROUND_COLOR);
-
-        prelude::draw_text("Conway's Game of Life", 10.0, 20.0, 30.0, prelude::Color::from_hex(0x1C30B0));
-
+        
 
         timer += prelude::get_frame_time();
         if timer > 0.01 {
@@ -159,9 +157,7 @@ async fn main() {
                 (CELL_SIZE - PADDING ) as f32* zoom_factor,
                 ALIVE_CELL_COLOR
             );
-
-            let centre = world_to_screen(0, 0, CELL_SIZE as f32, camera_offset, zoom_factor);
-            prelude::draw_circle(centre.0, centre.0, 15.0, ALIVE_CELL_COLOR );
+            
         }
 
 
@@ -194,6 +190,6 @@ fn initialize_cells(top_left: (i32,i32), bottom_right:(i32,i32)) -> HashSet<Cell
         }
     }
 
-    
+
     alive_cells
 }
