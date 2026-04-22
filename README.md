@@ -13,10 +13,10 @@ cp target/release/GOL .
 ## Run : 
 
 *Syntax :*
-`./GOL [density: 0.0 to 1.0] [height: 1000.0 by default] [width: 2000.0 by default]`
+`./GOL [--density|-d : 0.0 to 1.0] [--height|-h : 100 by default] [--width|-w : 200 by default]`
 
 *Examples :*  
-*   `./GOL 0.5 2000.0 5000.0`
+*   `./GOL --density 0.5 --height 1500 --width 1500`
 *  `cargo run`
 
 
