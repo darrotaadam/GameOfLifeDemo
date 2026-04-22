@@ -1,7 +1,9 @@
+pub mod GameOfLife;
+
 use macroquad::prelude;
 use std::collections::HashMap;
 use std::collections::HashSet;
-
+use std::fmt::format;
 use macroquad::input::mouse_position;
 use macroquad::math::{clamp, Vec2};
 
@@ -88,6 +90,9 @@ fn screen_to_world(
 #[macroquad::main("Conway's Game of Life")]
 async fn main() {
 
+    prelude::set_fullscreen(true);
+
+
     let mut density:f64 = 0.5;
     let mut height:f32 = 1000.0;
     let mut width:f32 = 2000.0;
@@ -120,7 +125,6 @@ async fn main() {
     let mut pause_time: f32 = 0.1;
     let mut zoom_factor: f32 = 1.0;
     let mut is_ctrl_pressed = false;
-    let start_time = std::time::SystemTime::now();
     let mut timer = 0.0;
     let mut zoomed: f32 ;
     let mut is_dragging = false;
@@ -139,10 +143,8 @@ async fn main() {
         }
         if is_dragging {
             let delta = mouse_pos - last_mouse_pos;
-
             camera_offset.0 += delta.x;
             camera_offset.1 += delta.y;
-
             last_mouse_pos = mouse_pos;
         }
 
@@ -159,15 +161,19 @@ async fn main() {
                 pause_time = clamp( pause_time + zoomed/50.0, 0.001, 1.0);
             }
             else{
-                zoom_factor += zoomed * ZOOM_WHEEL_SENSITIVITY;
-                camera_offset.0 = mouse_position().0 - ( ( mouse_position().0 - camera_offset.0 ) * zoom_factor / (zoom_factor - zoomed * ZOOM_WHEEL_SENSITIVITY) );
-                camera_offset.1 = mouse_position().1 - ( ( mouse_position().1 - camera_offset.1 ) * zoom_factor / (zoom_factor - zoomed * ZOOM_WHEEL_SENSITIVITY));
+                // il faut moduler le zoom factor de façon à ce qu'il reste supérieur à 0.0,
+                zoom_factor *= ( 1.0 + ZOOM_WHEEL_SENSITIVITY ).powf(zoomed) ;
+                let mouse = prelude::mouse_position();
+                camera_offset.0 = mouse.0 - ( ( mouse.0 - camera_offset.0 ) * zoom_factor / (zoom_factor - zoomed * ZOOM_WHEEL_SENSITIVITY) );
+                camera_offset.1 = mouse.1 - ( ( mouse.1 - camera_offset.1 ) * zoom_factor / (zoom_factor - zoomed * ZOOM_WHEEL_SENSITIVITY));
                 zoomed = 0.0;
             }
         }
 
         prelude::clear_background(BACKGROUND_COLOR);
 
+
+        prelude::draw_text( &format!("Coordinates {} {}", camera_offset.0, camera_offset.1 ), 10.0, 20.0, 20.0, prelude::WHITE);
 
         timer += prelude::get_frame_time();
         if timer > pause_time {
@@ -189,7 +195,6 @@ async fn main() {
             );
 
         }
-
 
         prelude::next_frame().await
     }
