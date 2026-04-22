@@ -117,8 +117,9 @@ async fn main() {
         density
     );
 
-
+    let mut pause_time: f32 = 0.1;
     let mut zoom_factor: f32 = 1.0;
+    let mut is_ctrl_pressed = false;
     let start_time = std::time::SystemTime::now();
     let mut timer = 0.0;
     let mut zoomed: f32 ;
@@ -145,20 +146,31 @@ async fn main() {
             last_mouse_pos = mouse_pos;
         }
 
+        if prelude::is_key_pressed(prelude::KeyCode::LeftControl) {
+            is_ctrl_pressed = true;
+        }
+        if prelude::is_key_released(prelude::KeyCode::LeftControl) {
+            is_ctrl_pressed = false;
+        }
 
         zoomed = prelude::mouse_wheel().1;
         if zoomed != 0.0{
-            zoom_factor += zoomed * ZOOM_WHEEL_SENSITIVITY;
-            camera_offset.0 = mouse_position().0 - ( ( mouse_position().0 - camera_offset.0 ) * zoom_factor / (zoom_factor - zoomed * ZOOM_WHEEL_SENSITIVITY) );
-            camera_offset.1 = mouse_position().1 - ( ( mouse_position().1 - camera_offset.1 ) * zoom_factor / (zoom_factor - zoomed * ZOOM_WHEEL_SENSITIVITY));
-            zoomed = 0.0;
+            if(is_ctrl_pressed){
+                pause_time = clamp( pause_time + zoomed/50.0, 0.001, 1.0);
+            }
+            else{
+                zoom_factor += zoomed * ZOOM_WHEEL_SENSITIVITY;
+                camera_offset.0 = mouse_position().0 - ( ( mouse_position().0 - camera_offset.0 ) * zoom_factor / (zoom_factor - zoomed * ZOOM_WHEEL_SENSITIVITY) );
+                camera_offset.1 = mouse_position().1 - ( ( mouse_position().1 - camera_offset.1 ) * zoom_factor / (zoom_factor - zoomed * ZOOM_WHEEL_SENSITIVITY));
+                zoomed = 0.0;
+            }
         }
 
         prelude::clear_background(BACKGROUND_COLOR);
 
 
         timer += prelude::get_frame_time();
-        if timer > 0.01 {
+        if timer > pause_time {
         timer = 0.0;
             alive_cells = next_generation(&alive_cells);
         }
