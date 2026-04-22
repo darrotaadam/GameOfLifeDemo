@@ -3,7 +3,6 @@ use macroquad::math::{clamp, Vec2};
 use std::option::Option;
 
 use macroquad::prelude;
-//use crate::{initialize_cells, world_to_screen, ALIVE_CELL_COLOR, DEFAULT_CELL_SIZE, DEFAULT_PADDING};
 
 const DEFAULT_DENSITY:f64 = 0.5;
 const DEFAULT_HEIGHT:u32 = 100;
@@ -94,10 +93,10 @@ impl GameOfLife {
 
             let coordinates = self.world_to_screen(cell.clone());
             prelude::draw_rectangle(
-                coordinates.0 - (DEFAULT_CELL_SIZE as f32  / 2.0 ) + DEFAULT_PADDING as f32,
-                coordinates.1 - (DEFAULT_CELL_SIZE as f32  / 2.0) + DEFAULT_PADDING as f32,
-                (DEFAULT_CELL_SIZE - DEFAULT_PADDING) as f32 * self.zoom_factor,
-                (DEFAULT_CELL_SIZE - DEFAULT_PADDING) as f32* self.zoom_factor,
+                coordinates.0 - (self.cell_size as f32  / 2.0 ) + self.padding as f32,
+                coordinates.1 - (self.cell_size as f32  / 2.0) + self.padding as f32,
+                (self.cell_size - self.padding) as f32 * self.zoom_factor,
+                (self.cell_size - self.padding) as f32* self.zoom_factor,
                 ALIVE_CELL_COLOR
             );
         }
@@ -115,16 +114,6 @@ impl GameOfLife {
         )
     }
 
-    fn screen_to_world(
-        &mut self,
-        screen_coordinates: (f32,f32)   // ( 0.0, 0.0 ) est en haut a gauche
-    )-> Cell // ( 0, 0 ) est au milieu
-    {
-        (
-            ((screen_coordinates.0 - self.camera_offset.0) / self.cell_size / self.zoom_factor ).floor() as i32,
-            ((screen_coordinates.1 - self.camera_offset.1) / self.cell_size / self.zoom_factor ).floor() as i32,
-        )
-    }
 
 
     fn find_neighbors( &mut self ) -> HashMap<Cell,u32>
@@ -192,7 +181,7 @@ impl GameOfLife {
 
         self.zoomed = prelude::mouse_wheel().1;
         if self.zoomed != 0.0{
-            if(self.is_ctrl_pressed){
+            if self.is_ctrl_pressed {
                 self.pause_time = clamp( self.pause_time + self.zoomed/50.0, 0.001, 1.0);
             }
             else{

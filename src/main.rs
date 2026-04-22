@@ -1,5 +1,5 @@
 use macroquad::prelude;
-use clap::{Arg, Command, builder::PathBufValueParser};
+use clap::{Arg, Command};
 pub mod game_of_life;
 
 
