@@ -15,7 +15,6 @@ async fn main(){
             .help("Initial density of alive cells (0.0 to 1.0)")
             .value_parser(clap::value_parser!(f64)))
         .arg(Arg::new("height")
-            .short('h')
             .long("height")
             .help("Height of the grid in cells")
             .value_parser(clap::value_parser!(u32)))
