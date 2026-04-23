@@ -7,12 +7,14 @@ use macroquad::prelude;
 const DEFAULT_DENSITY:f64 = 0.5;
 const DEFAULT_HEIGHT:u32 = 100;
 const DEFAULT_WIDTH:u32 = 200;
-const DEFAULT_PAUSE_TIME:f32 = 0.25;
+pub const DEFAULT_PAUSE_TIME:f32 = 0.25;
+pub const DEFAULT_MINIMAL_PAUSE_TIME:f32 = 0.00001;
+pub const DEFAULT_MAX_PAUSE_TIME:f32 = 1.0;
+
 static DEFAULT_PADDING:f32 = 1.0;
 static DEFAULT_CELL_SIZE:f32 = 8.0;
 const BACKGROUND_COLOR: prelude::Color = prelude::Color::from_hex(0x424242);
 const ALIVE_CELL_COLOR: prelude::Color = prelude::Color::from_hex(0xEBE8E8);
-const DEFAULT_MINIMAL_PAUSE_TIME:f32 = 0.00001;
 const ZOOM_WHEEL_SENSITIVITY: f32 = 0.1;
 
 
@@ -24,10 +26,10 @@ pub struct GameOfLife {
     pub height:u32 ,
     pub width:u32,
 
-    pause_time: f32,
+    pub pause_time: f32,
     zoom_factor: f32 ,
-    cell_size: f32,
-    padding: f32,
+    pub cell_size: f32,
+    pub padding: f32,
 
     is_ctrl_pressed :bool,
     is_dragging:bool,
@@ -41,7 +43,7 @@ pub struct GameOfLife {
 
     pub alive_cells: HashSet<Cell>,
     asked_exit:bool,
-    paused:bool,
+    pub paused:bool,
 }
 
 
@@ -194,7 +196,8 @@ impl GameOfLife {
         if self.zoomed != 0.0{
             if self.is_ctrl_pressed {
                 // on fait évoluer le temps de pause relativement a sa valeur actuelle au lieu de simplement ajouter self.zoomed, pour avoir un contrôle précis lors d'un temps proche de 0.0
-                self.pause_time = clamp(  self.pause_time + (self.pause_time * self.zoomed/50.0), DEFAULT_MINIMAL_PAUSE_TIME, 1.0);
+                self.set_pause_time( self.pause_time + ( self.zoomed/50.0 ).powf(self.pause_time) );
+
             }
             else{
                 // il faut moduler le zoom factor de façon à ce qu'il reste supérieur à 0.0,
@@ -229,6 +232,10 @@ impl GameOfLife {
         }
     }
 
+    pub fn set_pause_time(&mut self, time:f32){
+        self.pause_time = clamp(  time, DEFAULT_MINIMAL_PAUSE_TIME, DEFAULT_MAX_PAUSE_TIME);
+    }
+
     fn draw(&mut self){
         prelude::clear_background(BACKGROUND_COLOR);
 
@@ -245,7 +252,7 @@ impl GameOfLife {
         prelude::draw_text( &format!("Coordinates {} {}", self.camera_offset.0, self.camera_offset.1 ), 10.0, 60.0, 20.0, prelude::WHITE);
         prelude::draw_text( &format!("Zoom {} ", self.zoom_factor ), 10.0, 40.0, 20.0, prelude::WHITE);
         prelude::draw_text( &format!("Pause time : {:.5} s", self.pause_time), 10.0, 80.0, 20.0, prelude::WHITE);
-        prelude::draw_text( &format!("Live cells : {} s", self.alive_cells.len()), 10.0, 100.0, 20.0, prelude::WHITE);
+        prelude::draw_text( &format!("Live cells : {}", self.alive_cells.len()), 10.0, 100.0, 20.0, prelude::WHITE);
     }
     fn draw_exit_msg(&self){
         prelude::draw_rectangle(10.0, 10.0, 200.0, 30.0, prelude::Color::from_hex(0x212121));

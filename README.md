@@ -13,7 +13,16 @@ cp target/release/GOL .
 ## Run : 
 
 *Syntax :*
-`./GOL [--density|-d : 0.0 to 1.0] [--height : 100 by default] [--width|-w : 200 by default]`
+`./GOL [ args... ]`
+
+*Options :*
+* `--density <float>` : The density of the generated world (between 0 and 1, default: 0.5)
+* `--height <int>` : The height of the generated world (default: 1000)
+* `--width <int>` : The width of the generated world (default: 1000)
+* `-f, --fullscreen` : Fullscreen mode
+* `--pausetime <float>` :  Pause time between each generation in seconds ; 0.25 by default
+* `--paused` : Start in paused mode
+* `-h` : Show this help message and exit
 
 *Examples :*  
 * `./GOL`
