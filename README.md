@@ -26,3 +26,11 @@ cp target/release/GOL .
 *  `Mouse Pressed + Drag` : Move in the world
 * `Mouse Scroll` : Zoom in/out
 * `Left Ctrl + Mouse Scroll` : Change the speed of the simulation
+
+
+# Extras :
+*You can do some pretty cool things by playing with the density and the size of the generated area :*  
+
+* With `--density 0.999`
+    ![long](long_output.gif)
+    ![short](short_output.gif)
