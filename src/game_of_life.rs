@@ -12,7 +12,7 @@ static DEFAULT_PADDING:f32 = 1.0;
 static DEFAULT_CELL_SIZE:f32 = 8.0;
 const BACKGROUND_COLOR: prelude::Color = prelude::Color::from_hex(0x424242);
 const ALIVE_CELL_COLOR: prelude::Color = prelude::Color::from_hex(0xEBE8E8);
-
+const DEFAULT_MINIMAL_PAUSE_TIME:f32 = 0.00001;
 const ZOOM_WHEEL_SENSITIVITY: f32 = 0.1;
 
 
@@ -40,7 +40,8 @@ pub struct GameOfLife {
 
 
     pub alive_cells: HashSet<Cell>,
-    asked_exit:bool
+    asked_exit:bool,
+    paused:bool,
 }
 
 
@@ -67,7 +68,8 @@ impl GameOfLife {
             camera_offset: ( prelude::screen_width() / 2.0, prelude::screen_height() / 2.0 ),
 
             alive_cells: HashSet::new(),
-            asked_exit: false
+            asked_exit: false,
+            paused:false,
         }
     }
 
@@ -153,6 +155,9 @@ impl GameOfLife {
             self.asked_exit = true;
         }
 
+        if spacebar_pressed(){
+            self.paused = !self.paused;
+        }
 
         self.handle_regenerate_button();
 
@@ -172,7 +177,11 @@ impl GameOfLife {
             self.last_mouse_pos = mouse_pos;
         }
 
+        self.handle_mouse_wheel();
 
+    }
+
+    fn handle_mouse_wheel(&mut self){
         if ctrl_pressed() {
             self.is_ctrl_pressed = true;
         }
@@ -184,7 +193,8 @@ impl GameOfLife {
         self.zoomed = prelude::mouse_wheel().1;
         if self.zoomed != 0.0{
             if self.is_ctrl_pressed {
-                self.pause_time = clamp( self.pause_time + self.zoomed/50.0, 0.001, 1.0);
+                // on fait évoluer le temps de pause relativement a sa valeur actuelle au lieu de simplement ajouter self.zoomed, pour avoir un contrôle précis lors d'un temps proche de 0.0
+                self.pause_time = clamp(  self.pause_time + (self.pause_time * self.zoomed/50.0), DEFAULT_MINIMAL_PAUSE_TIME, 1.0);
             }
             else{
                 // il faut moduler le zoom factor de façon à ce qu'il reste supérieur à 0.0,
@@ -195,6 +205,18 @@ impl GameOfLife {
                 self.camera_offset.1 = mouse.1 - (mouse.1 - self.camera_offset.1) * self.zoom_factor / old_zoom;
                 self.zoomed = 0.0;
             }
+        }
+    }
+    fn handle_regenerate_button(&mut self){
+        let text = "Regenerate";
+        let font_size:f32 = 7.0;
+        let dimensions = Vec2::new(text.len() as f32* font_size * 2.0, text.len() as f32 * font_size/2.0 );
+
+        if macroquad::ui::widgets::Button::new(text)
+            .size( dimensions )
+            .position(  Vec2::new(prelude::screen_width()/2.0 - dimensions.x /2.0 , 30.0)  )
+            .ui(&mut macroquad::ui::root_ui()) {
+            self.initialize();
         }
     }
 
@@ -209,29 +231,36 @@ impl GameOfLife {
 
     fn draw(&mut self){
         prelude::clear_background(BACKGROUND_COLOR);
+
+        self.draw_metadata();
+
+        self.draw_generation();
+
+        self.draw_exit_msg();
+
+        self.draw_paused_status();
+    }
+
+    fn draw_metadata(& self){
         prelude::draw_text( &format!("Coordinates {} {}", self.camera_offset.0, self.camera_offset.1 ), 10.0, 60.0, 20.0, prelude::WHITE);
         prelude::draw_text( &format!("Zoom {} ", self.zoom_factor ), 10.0, 40.0, 20.0, prelude::WHITE);
-        prelude::draw_text( &format!("Pause time: {:.2} s", self.pause_time), 10.0, 80.0, 20.0, prelude::WHITE);
-        self.draw_generation();
+        prelude::draw_text( &format!("Pause time : {:.5} s", self.pause_time), 10.0, 80.0, 20.0, prelude::WHITE);
+        prelude::draw_text( &format!("Live cells : {} s", self.alive_cells.len()), 10.0, 100.0, 20.0, prelude::WHITE);
+    }
+    fn draw_exit_msg(&self){
         prelude::draw_rectangle(10.0, 10.0, 200.0, 30.0, prelude::Color::from_hex(0x212121));
         prelude::draw_text( "Press ESCAPE to exit", 30.0, 30.0, 20.0, prelude::WHITE);
     }
-
-
-    fn handle_regenerate_button(&mut self){
-        let text = "Regenerate";
-        let font_size:f32 = 7.0;
-        let dimensions = Vec2::new(text.len() as f32* font_size * 2.0, text.len() as f32 * font_size/2.0 );
-
-        if macroquad::ui::widgets::Button::new(text)
-            .size( dimensions )
-            .position(  Vec2::new(prelude::screen_width()/2.0 - dimensions.x /2.0 , 30.0)  )
-            .ui(&mut macroquad::ui::root_ui()) {
-            self.initialize();
+    fn draw_paused_status(&self){
+        if self.paused{
+            prelude::draw_rectangle(prelude::screen_width() - 80.0 - 10.0, prelude::screen_height() - 50.0, 80.0, 30.0, prelude::Color::from_hex(0x212121));
+            prelude::draw_text( "Paused", prelude::screen_width() - 78.0, prelude::screen_height() - 30.0, 20.0, prelude::WHITE);
         }
     }
 
-    
+
+
+
     pub async fn run(&mut self){
         loop
         {
@@ -239,9 +268,10 @@ impl GameOfLife {
                 break;
             }
             self.handle_input();
-            self.update();
+            if !self.paused{
+                self.update();
+            }
             self.draw();
-
             prelude::next_frame().await;
         }
     }
@@ -265,4 +295,7 @@ fn mouse_left_pressed()->bool{
 }
 fn mouse_left_released()->bool{
     prelude::is_mouse_button_released(prelude::MouseButton::Left)
+}
+fn spacebar_pressed()->bool{
+    prelude::is_key_pressed(prelude::KeyCode::Space)
 }
