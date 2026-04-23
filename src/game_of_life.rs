@@ -154,6 +154,8 @@ impl GameOfLife {
         }
 
 
+        self.handle_regenerate_button();
+
         let mouse_pos = Vec2::from(prelude::mouse_position());
 
         if mouse_left_pressed() {
@@ -216,6 +218,20 @@ impl GameOfLife {
     }
 
 
+    fn handle_regenerate_button(&mut self){
+        let text = "Regenerate";
+        let font_size:f32 = 7.0;
+        let dimensions = Vec2::new(text.len() as f32* font_size * 2.0, text.len() as f32 * font_size/2.0 );
+
+        if macroquad::ui::widgets::Button::new(text)
+            .size( dimensions )
+            .position(  Vec2::new(prelude::screen_width()/2.0 - dimensions.x /2.0 , 30.0)  )
+            .ui(&mut macroquad::ui::root_ui()) {
+            self.initialize();
+        }
+    }
+
+    
     pub async fn run(&mut self){
         loop
         {
