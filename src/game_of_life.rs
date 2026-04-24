@@ -196,7 +196,7 @@ impl GameOfLife {
         if self.zoomed != 0.0{
             if self.is_ctrl_pressed {
                 // on fait évoluer le temps de pause relativement a sa valeur actuelle au lieu de simplement ajouter self.zoomed, pour avoir un contrôle précis lors d'un temps proche de 0.0
-                self.set_pause_time( self.pause_time + ( self.zoomed/50.0 ).powf(self.pause_time) );
+                self.set_pause_time( self.pause_time + self.zoomed.signum() * self.pause_time * ( self.zoomed.abs()/50.0 ).powf(self.pause_time) );
 
             }
             else{
