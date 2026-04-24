@@ -42,4 +42,9 @@ cp target/release/GOL .
 
 * With `--density 0.999`
     ![long](long_output.gif)
-    ![short](short_output.gif)
+    ![short](short_output.gif)  
+    <br>
+  
+* With `--density 1.0 --height 1000 --width 1000` if you want to create a perfect symetrical square 
+    ![perfect_square](perfect_square.gif)
+    <br>
