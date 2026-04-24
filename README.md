@@ -1,6 +1,19 @@
 # Conway's Game of Life (poorly implemented)
 
-![Preview](Preview.png)
+**Conway's Game of Life** is a cellular simulation that evolves within a discrete universe with a 2D infinite grid of cells and a time that works by generations.
+The state of the grid changes at each generation according to a set of rules that each cell follows.
+Each cell can either be alive or dead.  
+<br>
+<u>The following rules are applied to each cell to determine its state in the next generation</u> :
+* Any **live cell** with *fewer than two live neighbors* **dies** (underpopulation).
+* Any **live cell** with *more than three live neighbors* **dies** (overpopulation).
+* Any **live cell** with *two or three live neighbors* **lives** on to the next generation.
+* Any **dead cell** with *exactly three live neighbors* **becomes a live cell** (reproduction).
+<br>
+
+This project is a simple implementation of this "game" using Rust and the macroquad crate.  
+It works by generating a rectangular area in which each cell is randomly set to be alive or dead according to a given probability (density parameter).
+![Preview](Preview.gif)
 
 
 ## Build :                                                                        
@@ -35,6 +48,9 @@ cp target/release/GOL .
 *  `Mouse Pressed + Drag` : Move in the world
 * `Mouse Scroll` : Zoom in/out
 * `Left Ctrl + Mouse Scroll` : Change the speed of the simulation
+* `Space` : Pause/Unpause the simulation
+* `Esc` : Exit the simulation
+* `R` : Regenerate the grid of cells according to the set density
 
 
 # Extras :

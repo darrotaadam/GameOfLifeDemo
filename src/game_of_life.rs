@@ -160,6 +160,11 @@ impl GameOfLife {
         if spacebar_pressed(){
             self.paused = !self.paused;
         }
+        
+        if r_pressed(){
+            self.initialize()
+        }
+        
 
         self.handle_regenerate_button();
 
@@ -305,4 +310,7 @@ fn mouse_left_released()->bool{
 }
 fn spacebar_pressed()->bool{
     prelude::is_key_pressed(prelude::KeyCode::Space)
+}
+fn r_pressed()->bool{
+    prelude::is_key_pressed(prelude::KeyCode::R)
 }
