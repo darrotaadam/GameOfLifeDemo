@@ -16,7 +16,7 @@ static DEFAULT_CELL_SIZE:f32 = 8.0;
 const BACKGROUND_COLOR: prelude::Color = prelude::Color::from_hex(0x424242);
 const ALIVE_CELL_COLOR: prelude::Color = prelude::Color::from_hex(0xEBE8E8);
 const ZOOM_WHEEL_SENSITIVITY: f32 = 0.1;
-
+const DEFAULT_PENCIL_THICKNESS: i32 = 15;
 
 type Cell = (i32, i32);
 
@@ -30,9 +30,11 @@ pub struct GameOfLife {
     zoom_factor: f32 ,
     pub cell_size: f32,
     pub padding: f32,
+    pencil_thickness: f32,
 
     is_ctrl_pressed :bool,
     is_dragging:bool,
+    is_drawing: bool,
 
     timer :f32,
     zoomed: f32 ,
@@ -59,9 +61,11 @@ impl GameOfLife {
             zoom_factor: 1.0,
             cell_size: DEFAULT_CELL_SIZE,
             padding: DEFAULT_PADDING,
+            pencil_thickness: DEFAULT_PENCIL_THICKNESS as f32,
 
             is_ctrl_pressed: ctrl_pressed(),
             is_dragging: false,
+            is_drawing: false,
 
             timer: 0.0,
             zoomed:0.0,
@@ -118,6 +122,13 @@ impl GameOfLife {
         )
     }
 
+    fn screen_to_world( &self, screen_coordinates:(f32, f32) )->Cell {
+        (
+            ((screen_coordinates.0 - self.camera_offset.0 ) / self.zoom_factor / self.cell_size ).round() as i32,
+            ((screen_coordinates.1 - self.camera_offset.1 ) / self.zoom_factor / self.cell_size).round() as i32
+        )
+    }
+
 
 
     fn find_neighbors( &mut self ) -> HashMap<Cell,u32>
@@ -164,28 +175,166 @@ impl GameOfLife {
         if r_pressed(){
             self.initialize()
         }
-        
+       
+        if shift_pressed(){
+            self.is_drawing = true;
+        }
+        if shift_released(){
+            self.is_drawing = false;
+        }
+
+        self.handle_thickness_change();
 
         self.handle_regenerate_button();
 
-        let mouse_pos = Vec2::from(prelude::mouse_position());
+        self.handle_mouse_drag();
+
+        self.handle_mouse_wheel();
+
+    }
+
+
+
+    fn handle_mouse_drag(&mut self){
+
+        let current_mouse_pos = Vec2::from(prelude::mouse_position());
 
         if mouse_left_pressed() {
             self.is_dragging = true;
-            self.last_mouse_pos = mouse_pos;
+            self.last_mouse_pos = current_mouse_pos;
         }
         if mouse_left_released() {
             self.is_dragging = false;
         }
         if self.is_dragging {
-            let delta = mouse_pos - self.last_mouse_pos;
-            self.camera_offset.0 += delta.x;
-            self.camera_offset.1 += delta.y;
-            self.last_mouse_pos = mouse_pos;
+       
+            if self.is_drawing{
+                self.handle_mouse_drag_draw(current_mouse_pos);
+                self.last_mouse_pos = current_mouse_pos;
+            }
+            else{
+                self.handle_mouse_drag_move(current_mouse_pos);
+            }
+
+                    }
+
+    }
+
+    
+    fn handle_mouse_drag_move( &mut self, current_mouse_pos: Vec2){
+        let delta = current_mouse_pos - self.last_mouse_pos;
+        self.camera_offset.0 += delta.x;
+        self.camera_offset.1 += delta.y;
+        self.last_mouse_pos = current_mouse_pos;
+    }
+
+    fn handle_mouse_drag_draw( &mut self, current_mouse_pos: Vec2){
+        /*
+            a le rôle de créer un tracé de cellules vivantes : si une cellule est morte elle passe
+            vivante, si elle est vivante elle le reste
+            TODO : ajouter une "gomme" qui permet de tuer des cellules au lieu de les rendre vivantes
+        */
+        let delta = current_mouse_pos - self.last_mouse_pos;
+        // consituer la liste des cellules situées sur le chemin du delta
+        // ajoute simplement cellule dans le set de cellules vivantes
+        
+
+
+
+        // doit réaliser une ligne droite entre self.last_mouse_pos et delta, donc pythagore mais il
+        // faut trouver la liste des cellules (x,y) dans la range (donc distance divisée par
+        // self.cell_size
+        // et ensuite ajouter chaque cellule en considérant: 
+        // self.zoom_factor , self.camera_offset (position de la souris par rapport au décalage de
+        // la caméra), self.cell_size
+
+        let last_mouse_pos_cell = self.screen_to_world( (self.last_mouse_pos.x, self.last_mouse_pos.y) );
+        let current_mouse_pos_cell = self.screen_to_world( (current_mouse_pos.x, current_mouse_pos.y) );
+    
+        // utilise l'algorithme de Bresenham pour créer une ligne de cellules 
+        
+        self.bresenham( last_mouse_pos_cell, current_mouse_pos_cell );
+
+    }
+
+    
+    fn bresenham( &mut self, origin: Cell, end: Cell )
+    { 
+        let mut origin = origin;
+        let mut end = end;
+
+
+        let dx = end.0.abs() - origin.0.abs();
+        let dy = end.1.abs() - origin.1.abs();
+
+                
+        
+        if dx >= dy {
+            
+            if origin.0 > end.0{
+                let tmp:(i32, i32) = (origin.0, origin.1);
+                origin.0 = end.0;
+                origin.1 = end.1;
+                end.0 = tmp.0;
+                end.0 = tmp.1; 
+            }
+            let m_new = 2 * (end.1 - origin.1);
+            let mut slope_error_new = m_new - (end.0 - origin.0);
+
+            let mut y = origin.1;
+            for x in origin.0 ..= end.0 {
+                
+                let offset_thickness = self.pencil_thickness as i32 - 1;
+                for _x in (-offset_thickness)..offset_thickness{
+
+                    for _y in (-offset_thickness) .. offset_thickness {
+
+                        self.alive_cells.insert( (x + _x , y + _y) );
+                    }
+                }
+                slope_error_new += m_new;
+
+                if slope_error_new >= 0 {
+                    y +=1 ;
+                    slope_error_new -= 2 * (end.0 - origin.0);
+                }
+
+            }
         }
+        else {
+            if origin.1 > end.1{
+                let tmp:(i32, i32) = (origin.0, origin.1);
+                origin.0 = end.0;
+                origin.1 = end.1;
+                end.0 = tmp.0;
+                end.1 = tmp.1; 
+            }
 
-        self.handle_mouse_wheel();
+            let m_new = 2 * (end.0 - origin.0);
+            let mut slope_error_new = m_new - (end.1 - origin.1);
+    
+            let mut x = origin.0;   
+            for y in origin.1 ..= end.1 {
+                
+                self.alive_cells.insert( (x,y) );
+                
+                slope_error_new += m_new;
 
+                if slope_error_new >= 0 {
+                    x +=1 ;
+                    slope_error_new -= 2 * (end.1 - origin.1);
+                }
+
+            }
+        }
+                
+    }
+
+
+    fn handle_thickness_change(&mut self){
+        //if macroquad::ui::widgets::Slider::new().ui(&mut macroquad::ui::root_ui()) {
+        macroquad::ui::root_ui().slider(0x10, "[0 .. 100]", 1f32 .. 1000f32, &mut self.pencil_thickness );                
+        
     }
 
     fn handle_mouse_wheel(&mut self){
@@ -314,3 +463,13 @@ fn spacebar_pressed()->bool{
 fn r_pressed()->bool{
     prelude::is_key_pressed(prelude::KeyCode::R)
 }
+
+fn shift_pressed()->bool{
+    prelude::is_key_pressed(prelude::KeyCode::LeftShift)
+}
+fn shift_released()->bool{
+    prelude::is_key_released(prelude::KeyCode::LeftShift)
+}
+
+
+
