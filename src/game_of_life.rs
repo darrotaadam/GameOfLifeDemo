@@ -1,6 +1,8 @@
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}};
+use macroquad::prelude::*;
 use macroquad::math::{clamp, Vec2};
 use std::option::Option;
+use ::rand::{RngExt};
 
 use macroquad::prelude;
 
@@ -11,14 +13,22 @@ pub const DEFAULT_PAUSE_TIME:f32 = 0.25;
 pub const DEFAULT_MINIMAL_PAUSE_TIME:f32 = 0.00001;
 pub const DEFAULT_MAX_PAUSE_TIME:f32 = 1.0;
 
-static DEFAULT_PADDING:f32 = 1.0;
+static DEFAULT_PADDING:f32 = 2.0;
 static DEFAULT_CELL_SIZE:f32 = 8.0;
 const BACKGROUND_COLOR: prelude::Color = prelude::Color::from_hex(0x424242);
 const ALIVE_CELL_COLOR: prelude::Color = prelude::Color::from_hex(0xEBE8E8);
+const CURSOR_PENCIL_COLOR: prelude::Color = prelude::Color::from_hex(0xAAAAAA);
+const CURSOR_ERASER_COLOR: prelude::Color = prelude::Color::from_hex(0x222222);
 const ZOOM_WHEEL_SENSITIVITY: f32 = 0.1;
-const DEFAULT_PENCIL_THICKNESS: i32 = 15;
+const DEFAULT_PENCIL_THICKNESS: i32 = 1;
 
 type Cell = (i32, i32);
+
+struct BresenhamCell {
+    main: i32,
+    aux : i32
+}
+
 
 pub struct GameOfLife {
 
@@ -35,6 +45,8 @@ pub struct GameOfLife {
     is_ctrl_pressed :bool,
     is_dragging:bool,
     is_drawing: bool,
+    is_erasing: bool,
+    has_switched_pen_mode: bool,
 
     timer :f32,
     zoomed: f32 ,
@@ -46,6 +58,8 @@ pub struct GameOfLife {
     pub alive_cells: HashSet<Cell>,
     asked_exit:bool,
     pub paused:bool,
+
+    is_mouse_on_ui:bool ,
 }
 
 
@@ -66,6 +80,8 @@ impl GameOfLife {
             is_ctrl_pressed: ctrl_pressed(),
             is_dragging: false,
             is_drawing: false,
+            is_erasing: false,
+            has_switched_pen_mode: false,
 
             timer: 0.0,
             zoomed:0.0,
@@ -76,6 +92,8 @@ impl GameOfLife {
             alive_cells: HashSet::new(),
             asked_exit: false,
             paused:false,
+            is_mouse_on_ui: false,
+
         }
     }
 
@@ -88,7 +106,7 @@ impl GameOfLife {
 
         for x in (0-x_half)..=x_half  {
             for y in (0-y_half)..=y_half {
-                if rand::random_bool( self.density ) {
+                if ::rand::rng().random_bool( self.density ) {
                     self.alive_cells.insert((x as i32, y as i32));
                 }
             }
@@ -98,18 +116,21 @@ impl GameOfLife {
 
     pub fn draw_generation(&mut self){
         for cell in &self.alive_cells {
-
-            let coordinates = self.world_to_screen(cell.clone());
-            prelude::draw_rectangle(
-                coordinates.0 - (self.cell_size as f32  / 2.0 ) + self.padding as f32,
-                coordinates.1 - (self.cell_size as f32  / 2.0) + self.padding as f32,
-                (self.cell_size - self.padding) as f32 * self.zoom_factor,
-                (self.cell_size - self.padding) as f32* self.zoom_factor,
-                ALIVE_CELL_COLOR
-            );
+            self.draw_cell( cell, ALIVE_CELL_COLOR); 
         }
     }
 
+
+    fn draw_cell( &self, cell: &Cell, color: prelude::Color){
+            let position = self.world_to_screen(cell.clone());
+            prelude::draw_rectangle(
+                position.0 - (self.cell_size as f32  / 2.0 ) + self.padding as f32,
+                position.1 - (self.cell_size as f32  / 2.0) + self.padding as f32,
+                (self.cell_size - self.padding) as f32 * self.zoom_factor,
+                (self.cell_size - self.padding) as f32* self.zoom_factor,
+                color
+            );
+    }
 
 
     fn world_to_screen(
@@ -162,6 +183,25 @@ impl GameOfLife {
 
 
 
+    fn draw_cursor( &mut self){
+        let cursor_pos = self.screen_to_world(prelude::mouse_position());
+
+        let offset_thickness = self.pencil_thickness as i32 -1;
+        
+        for _x in (-offset_thickness) .. offset_thickness +1{        
+            for _y in (-offset_thickness) .. offset_thickness +1{
+                
+                if self.is_erasing {
+                   self.draw_cell( &(cursor_pos.0 + _x, cursor_pos.1 + _y), CURSOR_ERASER_COLOR ); 
+                }
+                else{
+                    self.draw_cell( &(cursor_pos.0 + _x, cursor_pos.1 + _y), CURSOR_PENCIL_COLOR ); 
+                }
+            }
+        }
+    }
+
+
     fn handle_input(&mut self){
 
         if escape_pressed(){
@@ -175,6 +215,16 @@ impl GameOfLife {
         if r_pressed(){
             self.initialize()
         }
+
+        if e_pressed(){
+            if ! self.has_switched_pen_mode {
+                self.is_erasing = !self.is_erasing;
+                self.has_switched_pen_mode = true;
+            }
+        }
+        if e_released(){
+            self.has_switched_pen_mode = false;
+        }
        
         if shift_pressed(){
             self.is_drawing = true;
@@ -183,13 +233,15 @@ impl GameOfLife {
             self.is_drawing = false;
         }
 
-        self.handle_thickness_change();
 
         self.handle_regenerate_button();
 
-        self.handle_mouse_drag();
+        
+        if ! self.is_mouse_on_ui {
+            self.handle_mouse_drag();
 
-        self.handle_mouse_wheel();
+            self.handle_mouse_wheel();
+        }
 
     }
 
@@ -232,110 +284,91 @@ impl GameOfLife {
         /*
             a le rôle de créer un tracé de cellules vivantes : si une cellule est morte elle passe
             vivante, si elle est vivante elle le reste
-            TODO : ajouter une "gomme" qui permet de tuer des cellules au lieu de les rendre vivantes
         */
-        let delta = current_mouse_pos - self.last_mouse_pos;
         // consituer la liste des cellules situées sur le chemin du delta
         // ajoute simplement cellule dans le set de cellules vivantes
         
+        // utilise l'algorithme de Bresenham pour créer une ligne de cellules 
 
 
-
-        // doit réaliser une ligne droite entre self.last_mouse_pos et delta, donc pythagore mais il
-        // faut trouver la liste des cellules (x,y) dans la range (donc distance divisée par
-        // self.cell_size
-        // et ensuite ajouter chaque cellule en considérant: 
-        // self.zoom_factor , self.camera_offset (position de la souris par rapport au décalage de
-        // la caméra), self.cell_size
 
         let last_mouse_pos_cell = self.screen_to_world( (self.last_mouse_pos.x, self.last_mouse_pos.y) );
         let current_mouse_pos_cell = self.screen_to_world( (current_mouse_pos.x, current_mouse_pos.y) );
-    
-        // utilise l'algorithme de Bresenham pour créer une ligne de cellules 
-        
-        self.bresenham( last_mouse_pos_cell, current_mouse_pos_cell );
+       
+
+        let origin = last_mouse_pos_cell;
+        let end = current_mouse_pos_cell;
+
+        let dx = (end.0 - origin.0).abs();
+        let dy = (end.1 - origin.1).abs();       
+
+        // bresenham fonctionne sur une ligne dont la pente est inférieure à 1, donc si besoin on
+        // doit inverser les axes x et y, en précisant qu'on l'a fait afin de pouvoir récupérer le
+        // bon (x, y ) lors du dessin du rectangle
+        if dx >= dy {
+             self.bresenham( BresenhamCell { main: origin.0, aux: origin.1 } , BresenhamCell { main: end.0 , aux: end.1 } , false );
+        }
+        else{
+             self.bresenham(  BresenhamCell { main: origin.1, aux: origin.0 }  , BresenhamCell { main: end.1, aux: end.0 }  , true  );
+             
+        }
 
     }
 
     
-    fn bresenham( &mut self, origin: Cell, end: Cell )
+    fn bresenham( &mut self, origin: BresenhamCell, end: BresenhamCell, swapped: bool)
     { 
+        
         let mut origin = origin;
         let mut end = end;
-
-
-        let dx = end.0.abs() - origin.0.abs();
-        let dy = end.1.abs() - origin.1.abs();
-
-                
-        
-        if dx >= dy {
+ 
             
-            if origin.0 > end.0{
-                let tmp:(i32, i32) = (origin.0, origin.1);
-                origin.0 = end.0;
-                origin.1 = end.1;
-                end.0 = tmp.0;
-                end.0 = tmp.1; 
+            if origin.main > end.main{
+                let tmp:(i32, i32) = (origin.main, origin.aux);
+                origin.main = end.main;
+                origin.aux = end.aux;
+                end.main = tmp.0;
+                end.aux = tmp.1; 
             }
-            let m_new = 2 * (end.1 - origin.1);
-            let mut slope_error_new = m_new - (end.0 - origin.0);
 
-            let mut y = origin.1;
-            for x in origin.0 ..= end.0 {
-                
-                let offset_thickness = self.pencil_thickness as i32 - 1;
-                for _x in (-offset_thickness)..offset_thickness{
+            let m_new = 2 * (end.aux - origin.aux);
+            let mut slope_error_new = m_new - (end.main - origin.main);
 
-                    for _y in (-offset_thickness) .. offset_thickness {
+            let mut aux = origin.aux;
+            for main in origin.main ..= end.main {
+        
 
-                        self.alive_cells.insert( (x + _x , y + _y) );
+                let offset_thickness = self.pencil_thickness as i32 -1;
+                for _main in (-offset_thickness) .. offset_thickness +1{
+
+                    for _aux in (-offset_thickness) .. offset_thickness +1{
+                        let cell:Cell = if !swapped{
+                            ( main + _main, aux + _aux )
+                        }else{
+                            ( aux + _aux, main + _main )
+                        };
+
+
+                        if ! self.is_erasing {
+                            self.alive_cells.insert( cell );
+                        }else{
+                            self.alive_cells.remove( &cell );
+                        }
                     }
                 }
+            
                 slope_error_new += m_new;
 
                 if slope_error_new >= 0 {
-                    y +=1 ;
-                    slope_error_new -= 2 * (end.0 - origin.0);
+                    aux +=1 ;
+                    slope_error_new -= 2 * (end.main - origin.main);
                 }
-
             }
-        }
-        else {
-            if origin.1 > end.1{
-                let tmp:(i32, i32) = (origin.0, origin.1);
-                origin.0 = end.0;
-                origin.1 = end.1;
-                end.0 = tmp.0;
-                end.1 = tmp.1; 
-            }
+    }
 
-            let m_new = 2 * (end.0 - origin.0);
-            let mut slope_error_new = m_new - (end.1 - origin.1);
     
-            let mut x = origin.0;   
-            for y in origin.1 ..= end.1 {
-                
-                self.alive_cells.insert( (x,y) );
-                
-                slope_error_new += m_new;
 
-                if slope_error_new >= 0 {
-                    x +=1 ;
-                    slope_error_new -= 2 * (end.1 - origin.1);
-                }
-
-            }
-        }
-                
-    }
-
-
-    fn handle_thickness_change(&mut self){
-        //if macroquad::ui::widgets::Slider::new().ui(&mut macroquad::ui::root_ui()) {
-        macroquad::ui::root_ui().slider(0x10, "[0 .. 100]", 1f32 .. 1000f32, &mut self.pencil_thickness );                
-        
-    }
+    
 
     fn handle_mouse_wheel(&mut self){
         if ctrl_pressed() {
@@ -361,11 +394,11 @@ impl GameOfLife {
                 self.camera_offset.0 = mouse.0 - (mouse.0 - self.camera_offset.0) * self.zoom_factor / old_zoom;
                 self.camera_offset.1 = mouse.1 - (mouse.1 - self.camera_offset.1) * self.zoom_factor / old_zoom;
                 self.zoomed = 0.0;
-            }
+            } 
         }
     }
     fn handle_regenerate_button(&mut self){
-        let text = "Regenerate";
+        let text ="Regenerate";
         let font_size:f32 = 7.0;
         let dimensions = Vec2::new(text.len() as f32* font_size * 2.0, text.len() as f32 * font_size/2.0 );
 
@@ -403,10 +436,15 @@ impl GameOfLife {
     }
 
     fn draw_metadata(& self){
-        prelude::draw_text( &format!("Coordinates {} {}", self.camera_offset.0, self.camera_offset.1 ), 10.0, 60.0, 20.0, prelude::WHITE);
+        // pour afficher les coordonnées en cellules ont peut pas car on soustrait cette même
+        // valeur, donc on obtient (0, 0) 
+        let camera_offset_cells = self.screen_to_world( (0.0, 0.0) );
+        prelude::draw_text( &format!("Coordinates {} {}", - camera_offset_cells.0, - camera_offset_cells.1), 10.0, 60.0, 20.0, prelude::WHITE);
         prelude::draw_text( &format!("Zoom {} ", self.zoom_factor ), 10.0, 40.0, 20.0, prelude::WHITE);
         prelude::draw_text( &format!("Pause time : {:.5} s", self.pause_time), 10.0, 80.0, 20.0, prelude::WHITE);
         prelude::draw_text( &format!("Live cells : {}", self.alive_cells.len()), 10.0, 100.0, 20.0, prelude::WHITE);
+        prelude::draw_text( &format!("Eraser {}", self.is_erasing) , 10.0 , 120.0, 20.0, prelude::WHITE);
+        
     }
     fn draw_exit_msg(&self){
         prelude::draw_rectangle(10.0, 10.0, 200.0, 30.0, prelude::Color::from_hex(0x212121));
@@ -420,6 +458,37 @@ impl GameOfLife {
     }
 
 
+    fn display_egui( &mut self){
+       egui_macroquad::ui( |egui_context| {
+            self.is_mouse_on_ui = egui_context.is_pointer_over_area();
+
+            egui_macroquad::egui::Window::new("Pencil")
+                .fixed_pos( egui_macroquad::egui::pos2(screen_width() - 20.0 , screen_height() - 20.0)  )    
+                .resizable(false)
+                .show(egui_context, |ui| {
+                ui.add( egui_macroquad::egui::Slider::new( &mut self.pencil_thickness, 1.0..=20.0 )
+                    .text("Thickness"));
+
+                ui.checkbox(&mut self.is_erasing, "Eraser");
+
+                
+                ui.add( egui_macroquad::egui::Slider::new( &mut self.width, 1u32..=5000u32 )
+                    .logarithmic(true)
+                    .text("Width"));
+
+                ui.add( egui_macroquad::egui::Slider::new( &mut self.height, 1u32..=5000u32 )
+                    .logarithmic(true)
+                    .text("Height"));
+
+                
+                ui.add( egui_macroquad::egui::Slider::new( &mut self.density, 0.0f64..=1f64 )
+                    .text("Density"));
+            });
+        });
+
+       egui_macroquad::draw();
+    }
+
 
 
     pub async fn run(&mut self){
@@ -428,11 +497,21 @@ impl GameOfLife {
             if self.asked_exit{
                 break;
             }
+            
+
             self.handle_input();
             if !self.paused{
                 self.update();
             }
             self.draw();
+           
+            if self.is_drawing{
+                self.draw_cursor();
+            }
+
+
+            self.display_egui();
+
             prelude::next_frame().await;
         }
     }
@@ -472,4 +551,10 @@ fn shift_released()->bool{
 }
 
 
+fn e_pressed()->bool{
+    prelude::is_key_pressed(prelude::KeyCode::E)
+}
+fn e_released()->bool{
+    prelude::is_key_released(prelude::KeyCode::E)
+}
 
