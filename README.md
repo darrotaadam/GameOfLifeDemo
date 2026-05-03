@@ -15,7 +15,6 @@ This project is a simple implementation of this "game" using Rust and the macroq
 It works by generating a rectangular area in which each cell is randomly set to be alive or dead according to a given probability (density parameter).
 ![Preview](Preview.gif)
 
-
 ## Build :                                                                        
                                                                                   
 ```                                                                               
@@ -64,3 +63,7 @@ cp target/release/GOL .
 * With `--density 1.0 --height 1000 --width 1000` if you want to create a perfect symetrical square 
     ![perfect_square](perfect_square.gif)
     <br>
+
+* With a `low density` and a `huge area` you can create some kind of little universe and explore it 
+   ![Preview2](Preview2.gif)
+   <br>
